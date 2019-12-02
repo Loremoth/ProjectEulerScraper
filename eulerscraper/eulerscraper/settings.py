@@ -14,6 +14,9 @@ BOT_NAME = 'eulerscraper'
 SPIDER_MODULES = ['eulerscraper.spiders']
 NEWSPIDER_MODULE = 'eulerscraper.spiders'
 
+FEED_EXPORTERS = {
+    'json': 'eulerscraper.exporters.OrderedJsonItemExporter',
+}
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
 #USER_AGENT = 'eulerscraper (+http://www.yourdomain.com)'

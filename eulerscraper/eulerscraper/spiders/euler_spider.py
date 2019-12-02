@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
-import httplib2
+
 import requests
-from eulerscraper.items import Problem
-from scrapy.linkextractors import LinkExtractor
+import scrapy
+
 from scrapy.loader import ItemLoader
-from scrapy.spiders import CrawlSpider, Rule
+
+from eulerscraper.items import Problem
 
 
 def start_urls_detection():
@@ -23,18 +24,29 @@ def start_urls_detection():
     return su
 
 
-class EulerSpider(CrawlSpider):
+class EulerSpider(scrapy.Spider):
     name = 'euler'
     allowed_domains = ['projecteuler.net']
-    start_urls = start_urls_detection()
+    start_urls = ["https://projecteuler.net/archives"]
 
-    rules = (
-        # Extract links matching 'category.php' (but not matching 'subsection.php')
-        # and follow links from them (since no callback means follow=True by default).
-        # Rule(LinkExtractor(allow=('category\.php',), deny=('subsection\.php',))),
-        Rule(LinkExtractor(allow=('problem=\d*',)), callback="parse_problems"),
-        Rule(LinkExtractor(allow=('archives;page=\d*',), unique=True), follow=True)
-    )
+    def parse(self, response):
+        numpag = response.css("div.pagination a[href]::text").extract()
+        maxpag = int(numpag[len(numpag) - 1])
+
+        for href in response.css("table#problems_table a::attr(href)").extract():
+            next_page = "https://projecteuler.net/" + href
+            yield response.follow(next_page, self.parse_problems)
+
+        for i in range(2, maxpag + 1):
+            next_page = "https://projecteuler.net/archives;page=" + str(i)
+            yield response.follow(next_page, self.parse_next)
+
+        return [scrapy.Request("https://projecteuler.net/archives", self.parse)]
+
+    def parse_next(self, response):
+        for href in response.css("table#problems_table a::attr(href)").extract():
+            next_page = "https://projecteuler.net/" + href
+            yield response.follow(next_page, self.parse_problems)
 
     def parse_problems(self, response):
         l = ItemLoader(item=Problem(), response=response)
@@ -43,14 +55,3 @@ class EulerSpider(CrawlSpider):
         l.add_css("content", ".problem_content")
 
         yield l.load_item()
-
-    # def parse_content(self, response):
-    #     #return response.css("div.problem_content::text").extract()
-    #     next_page = "https://projecteuler.net/archives;page=2"
-    #     n = 3
-    #
-    #     while n < 14:
-    #         next_page = response.urljoin(next_page)
-    #         yield scrapy.Request(next_page, callback=self.parse)
-    #         next_page = next_page[0:len(next_page) - 1] + str(n)
-    #         n += 1
